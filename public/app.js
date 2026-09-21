@@ -1,9 +1,13 @@
 import { workspace } from './workspace.js';
 import { smtpType } from './views/smtp.js';
 import { mqttType } from './views/mqtt.js';
+import { httpType } from './views/http.js';
+import { redisType } from './views/redis.js';
+import { postgresType, mysqlType } from './views/sql.js';
+import { imapType, pop3Type } from './views/mail-in.js';
 
 // Register new tab types here (id must match the backend service id).
-const types = [smtpType, mqttType];
+const types = [smtpType, mqttType, httpType, redisType, postgresType, mysqlType, imapType, pop3Type];
 
 const api = (path, opts = {}) =>
   fetch(`/api${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts })

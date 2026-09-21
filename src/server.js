@@ -4,6 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { openStorage } from './core/storage.js';
 import { createSmtpService } from './services/smtp.js';
 import { createMqttService } from './services/mqtt.js';
+import { createHttpService } from './services/http.js';
+import { createRedisService } from './services/redis.js';
+import { createPostgresService, createMysqlService } from './services/sql.js';
+import { createImapService, createPop3Service } from './services/mail-in.js';
 
 const WEB_PORT = Number(process.env.WEB_PORT ?? 8025);
 const STORAGE_DIR = path.resolve(process.env.STORAGE_DIR ?? 'storage');
@@ -11,7 +15,10 @@ const STORAGE_DIR = path.resolve(process.env.STORAGE_DIR ?? 'storage');
 const { core, history } = openStorage(STORAGE_DIR);
 
 // Register new services here. Each exposes POST /api/services/<id>/client/test
-const services = [createSmtpService(), createMqttService()];
+const services = [
+  createSmtpService(), createMqttService(), createHttpService(), createRedisService(),
+  createPostgresService(), createMysqlService(), createImapService(), createPop3Service(),
+];
 
 const app = express();
 app.use(express.json({ limit: '5mb' }));

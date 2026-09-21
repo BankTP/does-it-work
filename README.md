@@ -12,8 +12,12 @@ It runs on your machine, keeps your configs and history in a local SQLite file, 
 |------|--------------|
 | **SMTP** | Connects to any SMTP server (plain, STARTTLS or SSL/TLS), optionally authenticates, and can send a real test email. Shows the full SMTP conversation (EHLO, AUTH, MAIL FROM, and so on) so you can see exactly where it fails. |
 | **MQTT** | Connects to a broker over `mqtt://`, `mqtts://`, `ws://` or `wss://`, with optional credentials, client ID and MQTT version (3.1, 3.1.1, 5.0). Can subscribe to a topic, publish a message, and listen for incoming messages. |
+| **HTTP** | Sends a request (any method, headers, body, Basic or Bearer auth), optionally follows redirects, and checks the status against what you expect (`200`, `2xx`, `200-299`). Shows the TLS details, response headers and a body preview. |
+| **Redis** | Connects (optionally over TLS, with ACL user and database), sends `AUTH` and `PING`, shows the server version, and can run one command such as `GET key`. |
+| **PostgreSQL / MySQL** | Connects and authenticates (TLS off, on, or verified), runs `SELECT 1` or your own query, and shows the server version. |
+| **IMAP / POP3** | Logs in over SSL/TLS, STARTTLS or plain. IMAP lists folders and counts the messages in a mailbox; POP3 shows capabilities and the `STAT` count. |
 
-More service types are planned, and adding one is small (see [Adding a new service type](#adding-a-new-service-type)).
+More service types are planned (see [Roadmap](#roadmap)), and adding one is small (see [Adding a new service type](#adding-a-new-service-type)).
 
 ## Features
 
@@ -66,8 +70,30 @@ Set these in `.env` (see `.env.example`):
 - **Saved passwords never go back to the browser.** When a config has a saved password, the form only shows a placeholder saying so. Leave the field blank to keep it (the server uses the stored one when you run the test), or type a new one to replace it.
 - **Saved passwords are encrypted at rest** with AES-256-GCM. The key is `ENCRYPTION_KEY` if you set it, otherwise a random key in `storage/secret.key` (created with owner-only permissions). Passwords saved as plain text by earlier versions are encrypted automatically on startup.
 - **What encryption does and doesn't protect.** With the auto-generated key, the key sits next to the database, so it protects against the database file leaking on its own (a stray copy, a backup, a commit) but not against someone who can read the whole `storage` folder. For stronger protection set `ENCRYPTION_KEY` and keep it outside `storage`. If the key is lost or changed, saved passwords cannot be recovered and you'll be asked to enter them again.
-- SMTP logs never contain your credentials: they're masked in the transcript.
+- Logs never contain your credentials: passwords, tokens and `Authorization` headers are masked in the transcript.
 - Other details (hosts, usernames, and the protocol logs) are stored as plain text. Protect the `storage` folder accordingly.
+
+## Roadmap
+
+Planned service types, roughly in priority order.
+
+**First batch** (done)
+- [x] **HTTP/HTTPS** (webhook/REST): method, headers, body, basic/bearer auth, expected status
+- [x] **Redis**: connect, AUTH, PING, optional GET/SET, TLS and ACL users
+- [x] **PostgreSQL / MySQL**: connect, authenticate, run `SELECT 1`, show TLS and version info
+- [x] **IMAP / POP3**: log in, list folders, count messages (completes the SMTP send-then-receive loop)
+
+**Next**
+- [ ] **TCP port and DNS**: connect check with latency; A, MX, TXT lookups (plus SPF/DKIM/DMARC)
+- [ ] **SFTP / FTP(S)**: password or key auth, list a directory, optional upload/delete of a probe file
+- [ ] **LDAP / LDAPS**: bind and search
+- [ ] **S3-compatible storage** (AWS, MinIO, R2): list a bucket, put and delete a probe object
+
+**Nice to have**
+- [ ] **AMQP (RabbitMQ) / Kafka**
+- [ ] **TLS certificate check**: expiry, chain, SANs, protocol versions
+- [ ] **WebSocket**: connect, send, receive
+- [ ] **Syslog / SNMP**
 
 ## Adding a new service type
 
@@ -78,4 +104,4 @@ History, saved configs, folders and tabs then work for the new type automaticall
 
 ## Tech
 
-Node.js, Express, `nodemailer`, `mqtt`, and the built-in `node:sqlite`. The frontend is plain JavaScript with no build step.
+Node.js, Express, `nodemailer`, `mqtt`, `ioredis`, `pg`, `mysql2`, `imapflow`, and the built-in `node:sqlite`. The frontend is plain JavaScript with no build step.
