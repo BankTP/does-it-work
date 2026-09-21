@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Does it work?</title>
+<script>try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Does it work?</h1>
+  <div class="theme" id="theme"><button data-t="light">Light</button><button data-t="system">System</button><button data-t="dark">Dark</button></div>
+</header>
+<main>
+  <section id="panel"></section>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

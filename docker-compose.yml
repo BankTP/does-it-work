@@ -1,0 +1,12 @@
+services:
+  tester:
+    build: .
+    restart: unless-stopped
+    environment:
+      # Port inside the container is fixed; change the host port via .env
+      WEB_PORT: 8025
+      STORAGE_DIR: /app/storage
+    ports:
+      - "${WEB_PORT:-8025}:8025"
+    volumes:
+      - ./storage:/app/storage

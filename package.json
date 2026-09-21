@@ -1,0 +1,15 @@
+{
+  "name": "does-it-work",
+  "version": "0.1.0",
+  "description": "Local web tool for testing services (SMTP now, MQTT etc. later)",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "dev": "node --watch --env-file-if-exists=.env src/server.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "mqtt": "^5.16.0",
+    "nodemailer": "^10.0.10"
+  }
+}
