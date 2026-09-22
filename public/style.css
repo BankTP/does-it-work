@@ -4,6 +4,8 @@
 .theme{margin-left:auto;display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .theme button{border:0;background:none;color:var(--muted);padding:4px 10px;cursor:pointer;font:inherit}
 .theme button.on{background:var(--accent);color:#fff}
+.ghlink{display:flex;align-items:center;color:var(--muted);border-radius:6px;padding:4px}
+.ghlink:hover{color:var(--fg);background:var(--bg)}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,sans-serif}
 header{display:flex;align-items:center;gap:24px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--card)}
