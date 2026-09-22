@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { createCipher } from './crypto.js';
 
-export const SECRET_KEYS = new Set(['pass', 'password']);
+export const SECRET_KEYS = new Set(['pass', 'password', 'privateKey', 'passphrase']);
 
 // core.db: things worth keeping and backing up — saved configs and folders.
 export function openCoreDb(file, dir) {

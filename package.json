@@ -1,19 +1,28 @@
 {
   "name": "does-it-work",
   "version": "0.1.0",
-  "description": "Local web tool for testing services (SMTP now, MQTT etc. later)",
+  "description": "Local web tool for testing services (SMTP, MQTT, HTTP, databases, mail, files and more)",
   "type": "module",
   "scripts": {
     "start": "node --env-file-if-exists=.env src/server.js",
     "dev": "node --watch --env-file-if-exists=.env src/server.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1136.0",
+    "@smithy/node-http-handler": "^4.12.1",
+    "amqplib": "^2.0.1",
+    "basic-ftp": "^6.2.1",
     "express": "^5.2.1",
     "imapflow": "^2.0.5",
     "ioredis": "^6.0.0",
+    "kafkajs": "^2.2.4",
+    "ldapts": "^9.2.0",
     "mqtt": "^5.16.0",
     "mysql2": "^3.24.4",
+    "net-snmp": "^3.29.1",
     "nodemailer": "^10.0.10",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "ssh2-sftp-client": "^12.1.1",
+    "ws": "^8.21.3"
   }
 }

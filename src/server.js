@@ -2,12 +2,18 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openStorage } from './core/storage.js';
+import { SECRET_KEYS } from './core/core-db.js';
 import { createSmtpService } from './services/smtp.js';
 import { createMqttService } from './services/mqtt.js';
 import { createHttpService } from './services/http.js';
 import { createRedisService } from './services/redis.js';
 import { createPostgresService, createMysqlService } from './services/sql.js';
 import { createImapService, createPop3Service } from './services/mail-in.js';
+import { createTcpService, createDnsService, createTlsService } from './services/net-tools.js';
+import { createSftpService, createFtpService, createS3Service } from './services/files.js';
+import { createLdapService } from './services/ldap.js';
+import { createAmqpService, createKafkaService } from './services/queues.js';
+import { createWebSocketService, createSyslogService, createSnmpService } from './services/messaging.js';
 
 const WEB_PORT = Number(process.env.WEB_PORT ?? 8025);
 const STORAGE_DIR = path.resolve(process.env.STORAGE_DIR ?? 'storage');
@@ -18,6 +24,8 @@ const { core, history } = openStorage(STORAGE_DIR);
 const services = [
   createSmtpService(), createMqttService(), createHttpService(), createRedisService(),
   createPostgresService(), createMysqlService(), createImapService(), createPop3Service(),
+  createTcpService(), createDnsService(), createTlsService(), createSftpService(), createFtpService(), createS3Service(),
+  createLdapService(), createAmqpService(), createKafkaService(), createWebSocketService(), createSyslogService(), createSnmpService(),
 ];
 
 const app = express();
@@ -77,7 +85,7 @@ for (const s of services) {
     req.body = body;
     if (configId) {
       const saved = core.configs.get(Number(configId));
-      if (saved) for (const k of ['pass', 'password']) if (!body[k] && saved.data[k]) body[k] = saved.data[k];
+      if (saved) for (const k of SECRET_KEYS) if (!body[k] && saved.data[k]) body[k] = saved.data[k];
     }
     const json = res.json.bind(res);
     res.json = (body) => { try { history.record(s.id, req.body, body); } catch (e) { console.error('[history]', e.message); } return json(body); };

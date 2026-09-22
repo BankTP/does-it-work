@@ -16,8 +16,17 @@ It runs on your machine, keeps your configs and history in a local SQLite file, 
 | **Redis** | Connects (optionally over TLS, with ACL user and database), sends `AUTH` and `PING`, shows the server version, and can run one command such as `GET key`. |
 | **PostgreSQL / MySQL** | Connects and authenticates (TLS off, on, or verified), runs `SELECT 1` or your own query, and shows the server version. |
 | **IMAP / POP3** | Logs in over SSL/TLS, STARTTLS or plain. IMAP lists folders and counts the messages in a mailbox; POP3 shows capabilities and the `STAT` count. |
+| **TCP** | Opens the port several times and reports min/avg/max latency. Can read the server banner. |
+| **DNS** | Looks up A, AAAA, MX, TXT, NS, CNAME, SOA, CAA, SRV or PTR records, optionally through a specific resolver. Can check SPF, DMARC and a DKIM selector. |
+| **TLS cert** | Shows the certificate (subject, issuer, SANs, chain, expiry), checks trust and hostname, warns before expiry, and can probe which TLS versions the server accepts. |
+| **SFTP / FTP(S)** | Logs in with a password (SFTP also with a private key), lists a directory, and can upload, read back and delete a probe file. FTP supports explicit and implicit TLS. |
+| **LDAP** | Binds (anonymous, or with a DN and password) over LDAP, LDAPS or STARTTLS, and can run a search. |
+| **S3** | Works with AWS, MinIO, R2 and others. Lists buckets or objects, and can put, read back and delete a probe object. |
+| **AMQP / Kafka** | RabbitMQ: connects and can round-trip a message on a temporary queue. Kafka: connects (TLS and SASL), describes the cluster, lists topics, and can produce a message. |
+| **WebSocket** | Like MQTT, a live connection: Connect, then send messages and pings and watch everything sent and received in a feed. Supports custom headers, subprotocols and a Bearer token. |
+| **Syslog / SNMP** | Syslog: sends a message over UDP, TCP or TLS (RFC 5424 or 3164). SNMP: queries an agent (v1 or v2c) for the OIDs you choose. |
 
-More service types are planned (see [Roadmap](#roadmap)), and adding one is small (see [Adding a new service type](#adding-a-new-service-type)).
+More service types can be added easily (see [Roadmap](#roadmap)), and adding one is small (see [Adding a new service type](#adding-a-new-service-type)).
 
 ## Features
 
@@ -66,34 +75,22 @@ Set these in `.env` (see `.env.example`):
 ## Security notes
 
 - **Run it only on your machine or a network you trust.** The server makes the outbound connections, so anyone who can reach the UI can make it connect to any host and port. There is no login.
-- **Passwords are never written to the history.** Saved configs store a password only if you tick *Save password with this config*.
-- **Saved passwords never go back to the browser.** When a config has a saved password, the form only shows a placeholder saying so. Leave the field blank to keep it (the server uses the stored one when you run the test), or type a new one to replace it.
-- **Saved passwords are encrypted at rest** with AES-256-GCM. The key is `ENCRYPTION_KEY` if you set it, otherwise a random key in `storage/secret.key` (created with owner-only permissions). Passwords saved as plain text by earlier versions are encrypted automatically on startup.
+- **Secrets are never written to the history.** That covers passwords, SFTP private keys and key passphrases. Saved configs store them only if you tick *Save password with this config*.
+- **Saved secrets never go back to the browser.** When a config has a saved password, the form only shows a placeholder saying so. Leave the field blank to keep it (the server uses the stored one when you run the test), or type a new one to replace it.
+- **Saved secrets are encrypted at rest** with AES-256-GCM. The key is `ENCRYPTION_KEY` if you set it, otherwise a random key in `storage/secret.key` (created with owner-only permissions). Secrets saved as plain text by earlier versions are encrypted automatically on startup.
 - **What encryption does and doesn't protect.** With the auto-generated key, the key sits next to the database, so it protects against the database file leaking on its own (a stray copy, a backup, a commit) but not against someone who can read the whole `storage` folder. For stronger protection set `ENCRYPTION_KEY` and keep it outside `storage`. If the key is lost or changed, saved passwords cannot be recovered and you'll be asked to enter them again.
+- SFTP accepts any host key (and logs its fingerprint), and the Syslog UDP test can't confirm delivery. Compare and check on the receiving side.
 - Logs never contain your credentials: passwords, tokens and `Authorization` headers are masked in the transcript.
 - Other details (hosts, usernames, and the protocol logs) are stored as plain text. Protect the `storage` folder accordingly.
 
 ## Roadmap
 
-Planned service types, roughly in priority order.
+Every service type planned so far is built. Ideas for later:
 
-**First batch** (done)
-- [x] **HTTP/HTTPS** (webhook/REST): method, headers, body, basic/bearer auth, expected status
-- [x] **Redis**: connect, AUTH, PING, optional GET/SET, TLS and ACL users
-- [x] **PostgreSQL / MySQL**: connect, authenticate, run `SELECT 1`, show TLS and version info
-- [x] **IMAP / POP3**: log in, list folders, count messages (completes the SMTP send-then-receive loop)
-
-**Next**
-- [ ] **TCP port and DNS**: connect check with latency; A, MX, TXT lookups (plus SPF/DKIM/DMARC)
-- [ ] **SFTP / FTP(S)**: password or key auth, list a directory, optional upload/delete of a probe file
-- [ ] **LDAP / LDAPS**: bind and search
-- [ ] **S3-compatible storage** (AWS, MinIO, R2): list a bucket, put and delete a probe object
-
-**Nice to have**
-- [ ] **AMQP (RabbitMQ) / Kafka**
-- [ ] **TLS certificate check**: expiry, chain, SANs, protocol versions
-- [ ] **WebSocket**: connect, send, receive
-- [ ] **Syslog / SNMP**
+- [ ] SNMPv3 (authentication and privacy)
+- [ ] Kafka consume, and AMQP publish/consume to a queue you name
+- [ ] SSH host-key pinning for SFTP (today any host key is accepted and its fingerprint is logged)
+- [ ] IMAP: fetch a message header, and send-then-receive round trip with SMTP
 
 ## Adding a new service type
 
@@ -104,4 +101,4 @@ History, saved configs, folders and tabs then work for the new type automaticall
 
 ## Tech
 
-Node.js, Express, `nodemailer`, `mqtt`, `ioredis`, `pg`, `mysql2`, `imapflow`, and the built-in `node:sqlite`. The frontend is plain JavaScript with no build step.
+Node.js, Express, `nodemailer`, `mqtt`, `ioredis`, `pg`, `mysql2`, `imapflow`, `ssh2-sftp-client`, `basic-ftp`, `ldapts`, `@aws-sdk/client-s3`, `amqplib`, `kafkajs`, `ws`, `net-snmp`, and the built-in `node:sqlite`. The frontend is plain JavaScript with no build step.

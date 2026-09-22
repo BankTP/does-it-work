@@ -14,6 +14,9 @@ const fillForm = (f, vals = {}) => {
 const resultHtml = (r) => `<p><b style="color:var(--${r.ok ? 'ok' : 'bad'})">${r.ok ? 'OK' : 'FAILED'}</b> · ${r.ms}ms ${esc(r.error || r.response || '')}</p>
   <pre class="log">${esc((r.log || []).join('\n'))}</pre>`;
 
+// Form fields holding secrets: never persisted in drafts, encrypted when saved (must match SECRET_KEYS on the server)
+const SECRETS = ['pass', 'password', 'privateKey', 'passphrase'];
+const SECRET_INPUTS = 'input[type=password],textarea[data-secret]';
 const SAVE_PASS_TOKEN = '<!--save-pass-->';
 const SAVE_PASS = '<label class="chk"><input type="checkbox" name="__savePass"> Save password with this config (stored encrypted)</label>';
 const PW_PLACEHOLDER = '•••••••• password saved — leave blank to keep';
@@ -48,7 +51,8 @@ export function workspace({ root, api, types }) {
       localStorage.setItem(TABS_KEY, JSON.stringify({
         active: active?.uid,
         tabs: tabs.map((t) => {
-          const { pass, password, __name, __folder, __savePass, ...data } = readForm(t.form);
+          const data = readForm(t.form);
+          for (const k of ['__name', '__folder', '__savePass', ...SECRETS]) delete data[k];
           return { uid: t.uid, service: t.service, configId: t.configId, folderId: t.folderId, name: t.name, dirty: t.dirty, data };
         }),
       }));
@@ -56,11 +60,25 @@ export function workspace({ root, api, types }) {
   };
 
   // ---- tab bar
+  const menuGroups = (() => {
+    const seen = [];
+    for (const t of types) if (!seen.includes(t.group)) seen.push(t.group);
+    return seen.map((g) => [g, types.filter((t) => t.group === g)]);
+  })();
+  const menuHtml = (filter = '') => {
+    const q = filter.trim().toLowerCase();
+    const match = (t) => !q || t.name.toLowerCase().includes(q) || t.group?.toLowerCase().includes(q);
+    const groups = menuGroups.map(([g, list]) => [g, list.filter(match)]).filter(([, list]) => list.length);
+    if (!groups.length) return '<p class="muted" style="margin:6px 8px">No matches</p>';
+    return groups.map(([g, list]) => `<div class="mgroup">${esc(g)}</div>${list.map((t) => `<button data-add="${t.id}"><span class="mdot" style="--c:${t.color}"></span>${esc(t.name)}</button>`).join('')}`).join('');
+  };
   const renderTabs = () => {
-    $('etabs').innerHTML = tabs.map((t) => `<div class="etab ${t === active ? 'on' : ''}" data-uid="${t.uid}">
-      ${tag(t.service)} ${typeOf(t.service).live ? `<span class="dot ${t.status}" title="${t.status}"></span> ` : ''}${t.running ? '<span class="spin">◌</span> ' : ''}<span class="ename">${esc(t.name)}</span>${t.dirty ? ' •' : ''}<button class="x" data-close="${t.uid}" title="Close">×</button></div>`).join('') +
+    $('etabs').innerHTML =
       `<div class="addwrap"><button class="b" id="plus" title="New tab">+</button><div class="menu" id="menu" hidden>
-        ${types.map((t) => `<button data-add="${t.id}">${tag(t.id)} New ${esc(t.name)}</button>`).join('')}</div></div>`;
+        ${types.length > 8 ? '<input class="mfilter" id="mfilter" placeholder="Filter…" autocomplete="off">' : ''}
+        <div id="mlist">${menuHtml()}</div></div></div>` +
+      tabs.map((t) => `<div class="etab ${t === active ? 'on' : ''}" data-uid="${t.uid}">
+      ${tag(t.service)} ${typeOf(t.service).live ? `<span class="dot ${t.status}" title="${t.status}"></span> ` : ''}${t.running ? '<span class="spin">◌</span> ' : ''}<span class="ename">${esc(t.name)}</span>${t.dirty ? ' •' : ''}<button class="x" data-close="${t.uid}" title="Close">×</button></div>`).join('');
     for (const t of tabs) t.el.hidden = t !== active;
     $('empty').hidden = tabs.length > 0;
     persist();
@@ -133,7 +151,7 @@ export function workspace({ root, api, types }) {
   }
 
   const setPwPlaceholder = (t) => {
-    for (const el of t.form.querySelectorAll('input[type=password]')) el.placeholder = t.hasSavedPassword ? PW_PLACEHOLDER : '';
+    for (const el of t.form.querySelectorAll(SECRET_INPUTS)) el.placeholder = t.hasSavedPassword ? PW_PLACEHOLDER : '';
   };
 
   const closeTab = (t) => {
@@ -235,8 +253,8 @@ export function workspace({ root, api, types }) {
     const name = d.__name.trim();
     const keepPass = d.__savePass;
     delete d.__name; delete d.__folder; delete d.__savePass;
-    for (const k of ['pass', 'password']) if (!d[k] || !keepPass) delete d[k];
-    const typed = !!(d.pass || d.password);
+    for (const k of SECRETS) if (!d[k] || !keepPass) delete d[k];
+    const typed = SECRETS.some((k) => d[k]);
     const payload = JSON.stringify({ name, data: d, folder_id: t.folderId, keep_secrets: keepPass && !typed && t.hasSavedPassword });
     const msg = t.el.querySelector('[data-role=msg]');
     try {
@@ -244,7 +262,7 @@ export function workspace({ root, api, types }) {
       else t.configId = (await api(`/services/${t.service}/configs`, { method: 'POST', body: payload })).id;
       t.name = name; t.dirty = false;
       t.hasSavedPassword = !!keepPass && (typed || t.hasSavedPassword);
-      if (t.hasSavedPassword) for (const el of t.form.querySelectorAll('input[type=password]')) el.value = ''; // now stored; show the placeholder instead
+      if (t.hasSavedPassword) for (const el of t.form.querySelectorAll(SECRET_INPUTS)) el.value = ''; // now stored; show the placeholder instead
       setPwPlaceholder(t);
       msg.textContent = 'Saved';
       setTimeout(() => (msg.textContent = ''), 2000);
@@ -322,14 +340,20 @@ export function workspace({ root, api, types }) {
   };
 
   $('etabs').onclick = (e) => {
-    if (e.target.closest('#plus')) { $('menu').hidden = !$('menu').hidden; return; }
+    if (e.target.closest('#plus')) {
+      const m = $('menu');
+      m.hidden = !m.hidden;
+      if (!m.hidden) { const f = $('mfilter'); if (f) { f.value = ''; $('mlist').innerHTML = menuHtml(); f.focus(); } }
+      return;
+    }
     const add = e.target.closest('[data-add]');
-    if (add) return openTab({ service: add.dataset.add });
+    if (add) { $('menu').hidden = true; return openTab({ service: add.dataset.add }); }
     const close = e.target.dataset.close;
     if (close) return closeTab(tabs.find((t) => t.uid == close));
     const tab = e.target.closest('.etab');
     if (tab) { active = tabs.find((t) => t.uid == tab.dataset.uid); renderTabs(); }
   };
+  $('etabs').oninput = (e) => { if (e.target.id === 'mfilter') $('mlist').innerHTML = menuHtml(e.target.value); };
   document.addEventListener('click', (e) => { if (!e.target.closest('.addwrap')) { const m = $('menu'); if (m) m.hidden = true; } });
 
   // ---- history (all types)
