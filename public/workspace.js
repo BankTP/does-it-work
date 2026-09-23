@@ -35,7 +35,8 @@ export function workspace({ root, api, types }) {
   const collapsed = new Set();
 
   root.innerHTML = `<div class="ws">
-    <aside class="card side"><div class="bar"><b class="grow">Saved</b><button class="b" id="newfolder" title="New folder">+ Folder</button></div><div id="saved"></div></aside>
+    <aside class="card side"><div class="bar"><b class="grow">Saved</b><button class="b" id="newfolder" title="New folder">+ Folder</button></div>
+      <input class="mfilter" id="savedSearch" placeholder="Search saved…" autocomplete="off"><div id="saved"></div></aside>
     <div class="main">
       <div class="etabs" id="etabs"></div>
       <div id="empty" class="card empty" hidden>No open tabs. Click <b>+</b> to add one.</div>
@@ -127,6 +128,7 @@ export function workspace({ root, api, types }) {
     t.form.elements.__name.value = t.name;
     t.form.elements.__savePass.checked = hasSecret;
     setPwPlaceholder(t);
+    addPasswordToggles(t);
     t.form.elements.__folder.innerHTML = folderOptions(folderId);
     $('editors').append(t.el);
     if (def.live) setLive(t, 'disconnected');
@@ -153,6 +155,32 @@ export function workspace({ root, api, types }) {
 
   const setPwPlaceholder = (t) => {
     for (const el of t.form.querySelectorAll(SECRET_INPUTS)) el.placeholder = t.hasSavedPassword ? PW_PLACEHOLDER : '';
+  };
+
+  const addPasswordToggles = (t) => {
+    for (const el of t.form.querySelectorAll('input[type=password]')) {
+      const wrap = document.createElement('div');
+      wrap.className = 'pwwrap';
+      el.replaceWith(wrap);
+      wrap.append(el);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pwtoggle';
+      btn.title = 'Show password';
+      btn.textContent = '👁';
+      btn.onclick = async () => {
+        const show = el.type === 'password';
+        if (show && !el.value && t.hasSavedPassword && t.configId) {
+          btn.disabled = true;
+          try { const secret = await api(`/configs/${t.configId}/secret`); if (secret[el.name]) el.value = secret[el.name]; }
+          catch {} finally { btn.disabled = false; }
+        }
+        el.type = show ? 'text' : 'password';
+        btn.textContent = show ? '🙈' : '👁';
+        btn.title = show ? 'Hide password' : 'Show password';
+      };
+      wrap.append(btn);
+    }
   };
 
   const duplicateTab = (t) => {
@@ -278,27 +306,43 @@ export function workspace({ root, api, types }) {
   }
 
   // ---- saved tree (folders + configs, drag & drop to move)
-  async function loadTree() {
-    [configs, folders] = await Promise.all([api('/configs').catch(() => []), api('/folders').catch(() => [])]);
+  let savedQuery = '';
+  const configMatches = (c) => {
+    const q = savedQuery;
+    return !q || c.name.toLowerCase().includes(q) || typeOf(c.service).name.toLowerCase().includes(q);
+  };
+  const renderSaved = () => {
+    const q = savedQuery;
+    const folderHasMatch = (id) =>
+      configs.some((c) => (c.folder_id ?? null) === id && configMatches(c)) ||
+      folders.some((f) => (f.parent_id ?? null) === id && folderHasMatch(f.id));
     const branch = (parent, depth) => {
       const pad = `style="padding-left:${8 + depth * 14}px"`;
       let h = '';
       for (const f of folders.filter((x) => (x.parent_id ?? null) === parent)) {
-        const closed = collapsed.has(f.id);
+        if (q && !folderHasMatch(f.id)) continue;
+        const closed = !q && collapsed.has(f.id);
         h += `<div class="frow" data-folder="${f.id}" ${pad}><span class="tog" data-toggle="${f.id}">${closed ? '▸' : '▾'}</span> 📁 <b class="grow">${esc(f.name)}</b>
           <span class="acts"><button class="x" data-fadd="${f.id}" title="New subfolder">＋</button><button class="x" data-fren="${f.id}" title="Rename">✎</button><button class="x" data-fdel="${f.id}" title="Delete folder">🗑</button></span></div>`;
         if (!closed) h += branch(f.id, depth + 1);
       }
       for (const c of configs.filter((x) => (x.folder_id ?? null) === parent)) {
+        if (q && !configMatches(c)) continue;
         h += `<div class="item" draggable="true" data-cfg="${c.id}" ${pad}>${tag(c.service)} <b>${esc(c.name)}</b>
           <button class="x" data-dupcfg="${c.id}" title="Duplicate" style="right:26px">⧉</button>
           <button class="x" data-delcfg="${c.id}" title="Delete">🗑</button></div>`;
       }
       return h;
     };
-    $('saved').innerHTML = (branch(null, 0) || '<p class="muted pad">Nothing saved yet.</p>') + '<div class="droproot" data-folder="">Drop here for top level</div>';
+    const empty = q ? '<p class="muted pad">No matches.</p>' : '<p class="muted pad">Nothing saved yet.</p>';
+    $('saved').innerHTML = (branch(null, 0) || empty) + (q ? '' : '<div class="droproot" data-folder="">Drop here for top level</div>');
+  };
+  async function loadTree() {
+    [configs, folders] = await Promise.all([api('/configs').catch(() => []), api('/folders').catch(() => [])]);
+    renderSaved();
     refreshFolderSelects();
   }
+  $('savedSearch').oninput = (e) => { savedQuery = e.target.value.trim().toLowerCase(); renderSaved(); };
 
   const promptName = (msg, def = '') => (prompt(msg, def) || '').trim();
   $('newfolder').onclick = async () => {
@@ -307,7 +351,7 @@ export function workspace({ root, api, types }) {
   };
   $('saved').onclick = async (e) => {
     const d = e.target.dataset;
-    if (d.toggle) { const id = Number(d.toggle); collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); return loadTree(); }
+    if (d.toggle) { const id = Number(d.toggle); collapsed.has(id) ? collapsed.delete(id) : collapsed.add(id); return renderSaved(); }
     if (d.fadd) {
       const name = promptName('Subfolder name'); if (!name) return;
       await api('/folders', { method: 'POST', body: JSON.stringify({ name, parent_id: Number(d.fadd) }) }); return loadTree();

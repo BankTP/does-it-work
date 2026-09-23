@@ -47,6 +47,14 @@ app.post('/api/services/:service/configs', (req, res) => {
   res.json({ id: core.configs.create(req.params.service, name, req.body.data, idOf(req.body.folder_id)) });
 });
 app.get('/api/configs/:id', (req, res) => { const c = core.configs.getPublic(Number(req.params.id)); c ? res.json(c) : res.sendStatus(404); });
+// Decrypted secret fields for one config — fetched only when the user clicks "show password", not on every load.
+app.get('/api/configs/:id/secret', (req, res) => {
+  const c = core.configs.get(Number(req.params.id));
+  if (!c) return res.sendStatus(404);
+  const out = {};
+  for (const k of SECRET_KEYS) if (c.data[k]) out[k] = c.data[k];
+  res.json(out);
+});
 app.put('/api/configs/:id', (req, res) => {
   const name = nameOf(req, res); if (!name) return;
   core.configs.update(Number(req.params.id), name, req.body.data, idOf(req.body.folder_id), !!req.body.keep_secrets) ? res.json({ ok: true }) : res.sendStatus(404);

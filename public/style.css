@@ -53,6 +53,10 @@ dialog{max-height:92vh;overflow:auto}
 .form h2{margin:0 0 4px;font-size:16px}
 label input[type=checkbox]{width:auto;margin-right:6px}
 .log{max-height:320px}
+.pwwrap{position:relative}
+.pwwrap input{padding-right:30px}
+.pwtoggle{position:absolute;right:2px;top:2px;bottom:2px;border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0 6px;border-radius:4px}
+.pwtoggle:hover{color:var(--fg)}
 .form .item{border:1px solid var(--line);border-radius:6px;margin-bottom:6px}
 #hdet{margin-top:10px}
 .ws{display:grid;grid-template-columns:220px minmax(0,1fr) 280px;gap:12px;align-items:start}
