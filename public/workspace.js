@@ -42,7 +42,8 @@ export function workspace({ root, api, types }) {
       <div id="editors"></div>
     </div>
     <aside class="card side"><div class="bar"><b class="grow">History</b><button class="b" id="clr">Clear</button></div><div id="hist"></div></aside>
-    <dialog id="hdlg"><div id="hdet"></div><div class="bar"><span class="grow"></span><button class="b" id="hclose">Close</button></div></dialog></div>`;
+    <dialog id="hdlg"><div id="hdet"></div><div class="bar"><span class="grow"></span><button class="b" id="hclose">Close</button></div></dialog>
+    <div class="menu" id="tabctx" hidden style="position:fixed"><button data-tact="dup">Duplicate</button><button data-tact="close">Close</button></div></div>`;
   const $ = (id) => root.querySelector('#' + id);
 
   // ---- persistence of open tabs (drafts; passwords excluded)
@@ -152,6 +153,12 @@ export function workspace({ root, api, types }) {
 
   const setPwPlaceholder = (t) => {
     for (const el of t.form.querySelectorAll(SECRET_INPUTS)) el.placeholder = t.hasSavedPassword ? PW_PLACEHOLDER : '';
+  };
+
+  const duplicateTab = (t) => {
+    const data = readForm(t.form);
+    for (const k of ['__name', '__folder', '__savePass']) delete data[k];
+    openTab({ service: t.service, folderId: t.folderId, name: `${t.name} copy`, data, dirty: true });
   };
 
   const closeTab = (t) => {
@@ -284,6 +291,7 @@ export function workspace({ root, api, types }) {
       }
       for (const c of configs.filter((x) => (x.folder_id ?? null) === parent)) {
         h += `<div class="item" draggable="true" data-cfg="${c.id}" ${pad}>${tag(c.service)} <b>${esc(c.name)}</b>
+          <button class="x" data-dupcfg="${c.id}" title="Duplicate" style="right:26px">⧉</button>
           <button class="x" data-delcfg="${c.id}" title="Delete">🗑</button></div>`;
       }
       return h;
@@ -314,6 +322,10 @@ export function workspace({ root, api, types }) {
       await api(`/folders/${d.fdel}`, { method: 'DELETE' });
       for (const t of tabs) if (t.folderId == d.fdel) t.folderId = null;
       return loadTree();
+    }
+    if (d.dupcfg) {
+      const c = await api(`/configs/${d.dupcfg}`);
+      return openTab({ service: c.service, folderId: c.folder_id, name: `${c.name} copy`, data: c.data, dirty: true });
     }
     if (d.delcfg) {
       if (!confirm('Delete this saved config?')) return;
@@ -354,7 +366,28 @@ export function workspace({ root, api, types }) {
     if (tab) { active = tabs.find((t) => t.uid == tab.dataset.uid); renderTabs(); }
   };
   $('etabs').oninput = (e) => { if (e.target.id === 'mfilter') $('mlist').innerHTML = menuHtml(e.target.value); };
-  document.addEventListener('click', (e) => { if (!e.target.closest('.addwrap')) { const m = $('menu'); if (m) m.hidden = true; } });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.addwrap')) { const m = $('menu'); if (m) m.hidden = true; }
+    if (!e.target.closest('#tabctx')) { const cm = $('tabctx'); if (cm) cm.hidden = true; }
+  });
+
+  // ---- tab context menu (right-click)
+  let ctxTab = null;
+  $('etabs').oncontextmenu = (e) => {
+    const tab = e.target.closest('.etab'); if (!tab) return;
+    e.preventDefault();
+    ctxTab = tabs.find((t) => t.uid == tab.dataset.uid);
+    const m = $('tabctx');
+    m.style.left = e.clientX + 'px'; m.style.top = e.clientY + 'px';
+    m.hidden = false;
+  };
+  $('tabctx').onclick = (e) => {
+    const a = e.target.dataset.tact; if (!a) return;
+    $('tabctx').hidden = true;
+    if (!ctxTab) return;
+    if (a === 'dup') duplicateTab(ctxTab);
+    else if (a === 'close') closeTab(ctxTab);
+  };
 
   // ---- history (all types)
   async function loadHistory() {
